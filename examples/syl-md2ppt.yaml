@@ -1,0 +1,39 @@
+filename:
+  pattern: '^(\d+)-(\d{3})-(Front|Back)\.md$'
+  groups:
+    domain: 1
+    card: 2
+    side: 3
+  order:
+    side: ["Front", "Back"]
+  ignore_unmatched: true
+
+layout:
+  slide:
+    width: 13.333
+    height: 7.5
+    unit: in
+  columns:
+    left_ratio: 0.5
+    gap: 0.2
+    padding: 0.3
+  typography:
+    font_family: "Calibri"
+    base_size: 20
+    min_size: 12
+    line_spacing: 1.2
+
+styles:
+  markers:
+    star: { prefix: "★", accent_bar: true, color: "8A6D1D" }
+    dot:  { prefix: "●", color: "1F2937" }
+    warn: { prefix: "▲", highlight: "FFE8B3", color: "9A3412" }
+  inline_formula:
+    delimiter: "$"
+    highlight: "FFF176"
+    color: "111827"
+
+output:
+  default_name:
+    timestamp_format: "20060102_150405"
+    random_suffix_len: 6
