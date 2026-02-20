@@ -3,6 +3,10 @@ GO ?= go
 BIN_DIR ?= bin
 BIN := $(BIN_DIR)/$(APP)
 DESTDIR ?=
+VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)
+COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo none)
+BUILD_TIME ?= $(shell date -u +"%Y-%m-%dT%H:%M:%SZ")
+LDFLAGS := -X 'syl-md2ppt/cmd.Version=$(VERSION)' -X 'syl-md2ppt/cmd.Commit=$(COMMIT)' -X 'syl-md2ppt/cmd.BuildTime=$(BUILD_TIME)'
 GO_BIN_DIR ?= $(shell sh -c 'gobin="$$( $(GO) env GOBIN )"; if [ -n "$$gobin" ]; then printf "%s" "$$gobin"; else gopath="$$( $(GO) env GOPATH )"; printf "%s/bin" "$${gopath%%:*}"; fi')
 INSTALL_BIN_DIR := $(DESTDIR)$(GO_BIN_DIR)
 INSTALL_BIN := $(INSTALL_BIN_DIR)/$(APP)
@@ -40,10 +44,13 @@ help:
 	@echo "  CONFIG=/path/conf.yaml   可选"
 	@echo "  GO_BIN_DIR=...           覆盖安装目录（默认 GOBIN 或 GOPATH/bin）"
 	@echo "  DESTDIR=                 打包场景根目录"
+	@echo "  VERSION=v0.1.0           可选，覆盖版本号"
+	@echo "  COMMIT=abc1234           可选，覆盖提交哈希"
+	@echo "  BUILD_TIME=...           可选，覆盖构建时间（UTC）"
 
 build:
 	@mkdir -p $(BIN_DIR)
-	$(GO) build -o $(BIN) .
+	$(GO) build -ldflags "$(LDFLAGS)" -o $(BIN) .
 
 test:
 	$(GO) test ./...

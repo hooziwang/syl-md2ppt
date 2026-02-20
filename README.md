@@ -10,11 +10,29 @@
 - 支持 `**粗体**`、`*斜体*`、`★/●/▲` 标识、`$...$` 公式亮色高亮
 - 模板化 YAML 配置（布局、字体、颜色、文件名解析规则）
 
-## 安装与运行
+## 安装
+
+### Homebrew（macOS）
+
+```bash
+brew tap hooziwang/tap
+brew install syl-md2ppt
+```
+
+### Scoop（Windows）
+
+```powershell
+scoop bucket add hooziwang https://github.com/hooziwang/scoop-bucket
+scoop install syl-md2ppt
+```
+
+### 源码构建（开发者）
 
 ```bash
 go build -o syl-md2ppt .
 ```
+
+## 运行
 
 ### 入口 1（直跑）
 
@@ -64,3 +82,25 @@ go build -o syl-md2ppt .
 ## 说明
 
 `/Users/wxy/Downloads/spi 2` 的混合内容拆分与中文补齐是前置数据整理，不属于本程序功能。
+
+## 自动发布（GitHub Releases + Homebrew + Scoop）
+
+已内置：
+
+- `.github/workflows/release.yml`
+- `.goreleaser.yml`
+
+发布触发方式：推送 `v*` tag（例如 `v1.0.1`）。
+
+```bash
+git tag -a v1.0.1 -m "release v1.0.1"
+git push origin v1.0.1
+```
+
+发布前一次性准备：
+
+1. 创建仓库 `hooziwang/homebrew-tap`（用于 Homebrew Formula）
+2. 创建仓库 `hooziwang/scoop-bucket`（用于 Scoop manifest）
+3. 在本仓库 `Settings -> Secrets and variables -> Actions` 增加：
+   - `HOMEBREW_TAP_GITHUB_TOKEN`：可写 `homebrew-tap` 的 token
+   - `SCOOP_BUCKET_GITHUB_TOKEN`：可写 `scoop-bucket` 的 token

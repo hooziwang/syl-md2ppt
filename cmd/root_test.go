@@ -3,10 +3,17 @@ package cmd
 import (
 	"bytes"
 	"reflect"
+	"regexp"
 	"strings"
 	"testing"
 	"time"
 )
+
+var ansiRegexp = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
+func stripANSI(s string) string {
+	return ansiRegexp.ReplaceAllString(s, "")
+}
 
 func TestBuildRequiresSourceArg(t *testing.T) {
 	stdout := &bytes.Buffer{}
@@ -57,8 +64,11 @@ func TestVersionCommand(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	got := strings.TrimSpace(stdout.String())
-	if got != versionText() {
+	got := stripANSI(strings.TrimSpace(stdout.String()))
+	if !strings.Contains(got, versionText()) {
+		t.Fatalf("unexpected version output: %q", got)
+	}
+	if !strings.Contains(got, "DADDYLOVESYL") {
 		t.Fatalf("unexpected version output: %q", got)
 	}
 }
@@ -75,8 +85,11 @@ func TestVersionFlagWithoutSource(t *testing.T) {
 		t.Fatalf("expected no error, got: %v", err)
 	}
 
-	got := strings.TrimSpace(stdout.String())
-	if got != versionText() {
+	got := stripANSI(strings.TrimSpace(stdout.String()))
+	if !strings.Contains(got, versionText()) {
+		t.Fatalf("unexpected version output: %q", got)
+	}
+	if !strings.Contains(got, "DADDYLOVESYL") {
 		t.Fatalf("unexpected version output: %q", got)
 	}
 }
