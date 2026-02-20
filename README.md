@@ -29,15 +29,13 @@ brew --version
 Apple Silicon（M1/M2/M3）如果装完还找不到 `brew`，执行：
 
 ```bash
-echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
-eval "$(/opt/homebrew/bin/brew shellenv)"
+echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile && eval "$(/opt/homebrew/bin/brew shellenv)"
 ```
 
 2. 安装 `syl-md2ppt`：
 
 ```bash
-brew tap hooziwang/tap
-brew install syl-md2ppt
+brew tap hooziwang/tap && brew install syl-md2ppt
 ```
 
 3. 验证安装：
@@ -49,8 +47,7 @@ syl-md2ppt -v
 4. 后续升级：
 
 ```bash
-brew update
-brew upgrade syl-md2ppt
+brew update && brew upgrade syl-md2ppt
 ```
 
 5. 卸载：
@@ -70,15 +67,13 @@ scoop --version
 如果提示找不到命令，先安装 Scoop：
 
 ```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
-irm get.scoop.sh | iex
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser -Force; irm get.scoop.sh | iex
 ```
 
 2. 安装 `syl-md2ppt`：
 
 ```powershell
-scoop bucket add hooziwang https://github.com/hooziwang/scoop-bucket
-scoop install syl-md2ppt
+scoop bucket add hooziwang https://github.com/hooziwang/scoop-bucket; scoop install syl-md2ppt
 ```
 
 3. 验证安装：
@@ -90,8 +85,7 @@ syl-md2ppt -v
 4. 后续升级：
 
 ```powershell
-scoop update
-scoop update syl-md2ppt
+scoop update; scoop update syl-md2ppt
 ```
 
 5. 卸载：
