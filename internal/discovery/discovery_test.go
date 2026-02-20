@@ -3,6 +3,7 @@ package discovery
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"syl-md2ppt/internal/config"
@@ -130,6 +131,43 @@ func TestDiscoverFailsOnMissingPair(t *testing.T) {
 	_, _, err := Discover(source, cfg)
 	if err == nil {
 		t.Fatalf("expected pairing error, got nil")
+	}
+}
+
+func TestDiscoverWarnsOnConflictGroup(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "SPI")
+	en := filepath.Join(source, "EN", "D")
+	cn := filepath.Join(source, "CN", "D")
+	if err := os.MkdirAll(en, 0o755); err != nil {
+		t.Fatalf("mkdir en: %v", err)
+	}
+	if err := os.MkdirAll(cn, 0o755); err != nil {
+		t.Fatalf("mkdir cn: %v", err)
+	}
+
+	// Same number key with unknown side labels => ambiguous matching group.
+	mustWrite(t, filepath.Join(en, "deck-1-1-012-X.md"), "EN X")
+	mustWrite(t, filepath.Join(en, "deck-1-1-012-Y.md"), "EN Y")
+	mustWrite(t, filepath.Join(cn, "课-1-1-012-X.md"), "CN X")
+	mustWrite(t, filepath.Join(cn, "课-1-1-012-Y.md"), "CN Y")
+
+	cfg := &config.Config{}
+	cfg.Filename.IgnoreUnmatched = true
+
+	_, warnings, err := Discover(source, cfg)
+	if err != nil {
+		t.Fatalf("Discover returned error: %v", err)
+	}
+	hasConflict := false
+	for _, w := range warnings {
+		if strings.Contains(w, "冲突组：") && strings.Contains(w, "D/012") {
+			hasConflict = true
+			break
+		}
+	}
+	if !hasConflict {
+		t.Fatalf("expected conflict warning, got: %#v", warnings)
 	}
 }
 

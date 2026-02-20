@@ -78,6 +78,14 @@ func Discover(source string, cfg *config.Config) ([]Pair, []string, error) {
 
 		sortParsedFiles(enGroup)
 		sortParsedFiles(cnGroup)
+		if isConflictGroup(enGroup, cnGroup) {
+			warnings = append(warnings, fmt.Sprintf(
+				"冲突组：%s；同一数字键对应多个候选，请人工确认。EN=[%s]；CN=[%s]",
+				displayGroupKey(key),
+				joinRelPaths(enGroup),
+				joinRelPaths(cnGroup),
+			))
+		}
 		for i := range enGroup {
 			pairs = append(pairs, Pair{
 				RelPath:  enGroup[i].relPath,
@@ -339,4 +347,51 @@ func compareIntSlice(a, b []int) int {
 		return 1
 	}
 	return 0
+}
+
+func isConflictGroup(enGroup, cnGroup []parsedFile) bool {
+	if len(enGroup) <= 1 && len(cnGroup) <= 1 {
+		return false
+	}
+	if len(enGroup) > 2 || len(cnGroup) > 2 {
+		return true
+	}
+	ef, eb, eu := sideStats(enGroup)
+	cf, cb, cu := sideStats(cnGroup)
+
+	if ef > 1 || eb > 1 || cf > 1 || cb > 1 {
+		return true
+	}
+	if (eu > 0 && len(enGroup) > 1) || (cu > 0 && len(cnGroup) > 1) {
+		return true
+	}
+	if ef != cf || eb != cb {
+		return true
+	}
+	return false
+}
+
+func sideStats(group []parsedFile) (front int, back int, unknown int) {
+	for _, f := range group {
+		switch f.sideRank {
+		case 0:
+			front++
+		case 1:
+			back++
+		default:
+			unknown++
+		}
+	}
+	return front, back, unknown
+}
+
+func joinRelPaths(group []parsedFile) string {
+	if len(group) == 0 {
+		return ""
+	}
+	parts := make([]string, 0, len(group))
+	for _, f := range group {
+		parts = append(parts, f.relPath)
+	}
+	return strings.Join(parts, ", ")
 }
