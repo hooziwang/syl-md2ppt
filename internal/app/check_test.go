@@ -50,3 +50,39 @@ func TestCheck_OK(t *testing.T) {
 		t.Fatalf("unexpected EN back path: %s", res.Items[1].ENPath)
 	}
 }
+
+func TestCheck_ConflictDetected(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "SPI")
+	enDir := filepath.Join(source, "EN", "D")
+	cnDir := filepath.Join(source, "CN", "D")
+	if err := os.MkdirAll(enDir, 0o755); err != nil {
+		t.Fatalf("mkdir en: %v", err)
+	}
+	if err := os.MkdirAll(cnDir, 0o755); err != nil {
+		t.Fatalf("mkdir cn: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(enDir, "deck-1-1-012-X.md"), []byte("EN X"), 0o644); err != nil {
+		t.Fatalf("write en x: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(enDir, "deck-1-1-012-Y.md"), []byte("EN Y"), 0o644); err != nil {
+		t.Fatalf("write en y: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cnDir, "课-1-1-012-X.md"), []byte("CN X"), 0o644); err != nil {
+		t.Fatalf("write cn x: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cnDir, "课-1-1-012-Y.md"), []byte("CN Y"), 0o644); err != nil {
+		t.Fatalf("write cn y: %v", err)
+	}
+
+	res, err := Check(Options{SourceDir: source, CWD: tmp})
+	if err != nil {
+		t.Fatalf("Check returned error: %v", err)
+	}
+	if !res.HasConflict {
+		t.Fatalf("expected HasConflict=true")
+	}
+	if res.ConflictCount != 1 {
+		t.Fatalf("expected one conflict group, got %d", res.ConflictCount)
+	}
+}

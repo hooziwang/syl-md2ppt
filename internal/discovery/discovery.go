@@ -19,6 +19,10 @@ type Pair struct {
 	sideRank int
 }
 
+type DiscoverOptions struct {
+	FailOnConflict bool
+}
+
 type parsedFile struct {
 	relPath    string
 	absPath    string
@@ -29,7 +33,7 @@ type parsedFile struct {
 	sortHint   string
 }
 
-func Discover(source string, cfg *config.Config) ([]Pair, []string, error) {
+func Discover(source string, cfg *config.Config, opts DiscoverOptions) ([]Pair, []string, error) {
 	if cfg == nil {
 		return nil, nil, fmt.Errorf("配置为空，没法继续")
 	}
@@ -61,6 +65,7 @@ func Discover(source string, cfg *config.Config) ([]Pair, []string, error) {
 
 	pairs := make([]Pair, 0)
 	missing := make([]string, 0)
+	conflicts := make([]string, 0)
 	for _, key := range keyList {
 		enGroup := enGroups[key]
 		cnGroup := cnGroups[key]
@@ -79,12 +84,14 @@ func Discover(source string, cfg *config.Config) ([]Pair, []string, error) {
 		sortParsedFiles(enGroup)
 		sortParsedFiles(cnGroup)
 		if isConflictGroup(enGroup, cnGroup) {
-			warnings = append(warnings, fmt.Sprintf(
+			conflictMsg := fmt.Sprintf(
 				"冲突组：%s；同一数字键对应多个候选，请人工确认。EN=[%s]；CN=[%s]",
 				displayGroupKey(key),
 				joinRelPaths(enGroup),
 				joinRelPaths(cnGroup),
-			))
+			)
+			warnings = append(warnings, conflictMsg)
+			conflicts = append(conflicts, conflictMsg)
 		}
 		for i := range enGroup {
 			pairs = append(pairs, Pair{
@@ -100,6 +107,10 @@ func Discover(source string, cfg *config.Config) ([]Pair, []string, error) {
 	if len(missing) > 0 {
 		sort.Strings(missing)
 		return nil, warnings, fmt.Errorf("中英文文件没配齐：%s", strings.Join(missing, "；"))
+	}
+	if opts.FailOnConflict && len(conflicts) > 0 {
+		sort.Strings(conflicts)
+		return nil, warnings, fmt.Errorf("发现 %d 组配对冲突：%s", len(conflicts), strings.Join(conflicts, "；"))
 	}
 
 	sort.Slice(pairs, func(i, j int) bool {
@@ -191,33 +202,38 @@ func numberFingerprint(name string) (string, []int) {
 		return "", nil
 	}
 
+	canon := make([]string, 0, len(all))
 	count := make(map[string]int, len(all))
 	for _, token := range all {
-		count[token]++
+		n, err := strconv.Atoi(token)
+		if err != nil {
+			canon = append(canon, "")
+			continue
+		}
+		key := strconv.Itoa(n)
+		canon = append(canon, key)
+		count[key]++
 	}
 
-	unique := make([]string, 0, len(all))
-	seen := make(map[string]struct{}, len(all))
-	for _, token := range all {
+	unique := make([]string, 0, len(canon))
+	ints := make([]int, 0, len(canon))
+	seen := make(map[string]struct{}, len(canon))
+	for _, token := range canon {
+		if token == "" {
+			continue
+		}
 		if count[token] != 1 {
 			continue
 		}
 		if _, ok := seen[token]; ok {
 			continue
 		}
-		seen[token] = struct{}{}
-		unique = append(unique, token)
-	}
-	if len(unique) == 0 {
-		return "", nil
-	}
-
-	ints := make([]int, 0, len(unique))
-	for _, token := range unique {
 		n, err := strconv.Atoi(token)
 		if err != nil {
 			continue
 		}
+		seen[token] = struct{}{}
+		unique = append(unique, token)
 		ints = append(ints, n)
 	}
 	if len(ints) == 0 {

@@ -12,11 +12,13 @@ import (
 )
 
 type CheckResult struct {
-	PairCount    int
-	WarningCount int
-	Warnings     []string
-	Items        []CheckItem
-	ConfigSource string
+	PairCount     int
+	WarningCount  int
+	ConflictCount int
+	HasConflict   bool
+	Warnings      []string
+	Items         []CheckItem
+	ConfigSource  string
 }
 
 type CheckItem struct {
@@ -44,7 +46,9 @@ func Check(opts Options) (CheckResult, error) {
 		return CheckResult{}, err
 	}
 
-	pairs, warnings, err := discovery.Discover(opts.SourceDir, cfg)
+	pairs, warnings, err := discovery.Discover(opts.SourceDir, cfg, discovery.DiscoverOptions{
+		FailOnConflict: false,
+	})
 	if err != nil {
 		return CheckResult{}, err
 	}
@@ -53,6 +57,7 @@ func Check(opts Options) (CheckResult, error) {
 	}
 
 	warnings = dedupeStrings(warnings)
+	conflictCount := countConflictWarnings(warnings)
 	items := make([]CheckItem, 0, len(pairs))
 	for i, p := range pairs {
 		items = append(items, CheckItem{
@@ -68,12 +73,24 @@ func Check(opts Options) (CheckResult, error) {
 		return items[i].ENPath < items[j].ENPath
 	})
 	return CheckResult{
-		PairCount:    len(pairs),
-		WarningCount: len(warnings),
-		Warnings:     warnings,
-		Items:        items,
-		ConfigSource: cfgSrc,
+		PairCount:     len(pairs),
+		WarningCount:  len(warnings),
+		ConflictCount: conflictCount,
+		HasConflict:   conflictCount > 0,
+		Warnings:      warnings,
+		Items:         items,
+		ConfigSource:  cfgSrc,
 	}, nil
+}
+
+func countConflictWarnings(in []string) int {
+	count := 0
+	for _, s := range in {
+		if strings.HasPrefix(s, "冲突组：") {
+			count++
+		}
+	}
+	return count
 }
 
 func toAbsPath(path, cwd string) string {

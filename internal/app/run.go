@@ -65,7 +65,9 @@ func Run(opts Options) (Result, error) {
 		return Result{}, err
 	}
 
-	pairs, discoverWarn, err := discovery.Discover(opts.SourceDir, cfg)
+	pairs, discoverWarn, err := discovery.Discover(opts.SourceDir, cfg, discovery.DiscoverOptions{
+		FailOnConflict: true,
+	})
 	if err != nil {
 		return Result{}, err
 	}

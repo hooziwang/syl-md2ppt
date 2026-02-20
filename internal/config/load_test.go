@@ -11,10 +11,10 @@ func TestLoadConfig_Priority(t *testing.T) {
 	projectCfg := filepath.Join(tmp, "syl-md2ppt.yaml")
 	overrideCfg := filepath.Join(tmp, "override.yaml")
 
-	if err := os.WriteFile(projectCfg, []byte("filename:\n  pattern: '^A-(\\d+)-(Front|Back)\\.md$'\n"), 0o644); err != nil {
+	if err := os.WriteFile(projectCfg, []byte("filename:\n  ignore_unmatched: true\n"), 0o644); err != nil {
 		t.Fatalf("write project config: %v", err)
 	}
-	if err := os.WriteFile(overrideCfg, []byte("filename:\n  pattern: '^B-(\\d+)-(Front|Back)\\.md$'\n"), 0o644); err != nil {
+	if err := os.WriteFile(overrideCfg, []byte("filename:\n  ignore_unmatched: false\n"), 0o644); err != nil {
 		t.Fatalf("write override config: %v", err)
 	}
 
@@ -25,8 +25,8 @@ func TestLoadConfig_Priority(t *testing.T) {
 	if src != overrideCfg {
 		t.Fatalf("expected source %s, got %s", overrideCfg, src)
 	}
-	if cfg.Filename.Pattern != "^B-(\\d+)-(Front|Back)\\.md$" {
-		t.Fatalf("unexpected override pattern: %s", cfg.Filename.Pattern)
+	if cfg.Filename.IgnoreUnmatched {
+		t.Fatalf("expected override ignore_unmatched=false")
 	}
 
 	cfg, src, err = Load("", tmp)
@@ -36,8 +36,8 @@ func TestLoadConfig_Priority(t *testing.T) {
 	if src != projectCfg {
 		t.Fatalf("expected source %s, got %s", projectCfg, src)
 	}
-	if cfg.Filename.Pattern != "^A-(\\d+)-(Front|Back)\\.md$" {
-		t.Fatalf("unexpected project pattern: %s", cfg.Filename.Pattern)
+	if !cfg.Filename.IgnoreUnmatched {
+		t.Fatalf("expected project ignore_unmatched=true")
 	}
 }
 
@@ -50,10 +50,7 @@ func TestLoadConfig_DefaultFallback(t *testing.T) {
 	if src != "embedded:default.yaml" {
 		t.Fatalf("unexpected source: %s", src)
 	}
-	if cfg.Filename.Pattern == "" {
-		t.Fatalf("default filename pattern should not be empty")
-	}
-	if len(cfg.Filename.Order.Side) == 0 {
-		t.Fatalf("default side order should not be empty")
+	if cfg.Layout.Typography.BaseSize <= 0 {
+		t.Fatalf("default base font should be positive")
 	}
 }

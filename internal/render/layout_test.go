@@ -66,7 +66,6 @@ func TestBuildSlide_ENAndCNCanEachAddOneExtraColumn(t *testing.T) {
 
 func minimalConfig() *config.Config {
 	cfg := &config.Config{}
-	cfg.Filename.Pattern = `^(\d+)-(\d{3})-(Front|Back)\.md$`
 	cfg.Layout.Slide.Width = 13.333
 	cfg.Layout.Slide.Height = 7.5
 	cfg.Layout.Columns.LeftRatio = 0.5

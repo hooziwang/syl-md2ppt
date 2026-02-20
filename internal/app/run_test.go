@@ -127,3 +127,42 @@ func TestRun_WarningContainsSlideNumber(t *testing.T) {
 		t.Fatalf("warning should use concise truncate message, got: %s", res.Warnings[0])
 	}
 }
+
+func TestRun_FailsOnConflictGroup(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "SPI")
+	enDir := filepath.Join(source, "EN", "D")
+	cnDir := filepath.Join(source, "CN", "D")
+	if err := os.MkdirAll(enDir, 0o755); err != nil {
+		t.Fatalf("mkdir en: %v", err)
+	}
+	if err := os.MkdirAll(cnDir, 0o755); err != nil {
+		t.Fatalf("mkdir cn: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(enDir, "deck-1-1-012-X.md"), []byte("EN X"), 0o644); err != nil {
+		t.Fatalf("write en x: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(enDir, "deck-1-1-012-Y.md"), []byte("EN Y"), 0o644); err != nil {
+		t.Fatalf("write en y: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cnDir, "课-1-1-012-X.md"), []byte("CN X"), 0o644); err != nil {
+		t.Fatalf("write cn x: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cnDir, "课-1-1-012-Y.md"), []byte("CN Y"), 0o644); err != nil {
+		t.Fatalf("write cn y: %v", err)
+	}
+
+	_, err := Run(Options{
+		SourceDir: source,
+		OutputArg: filepath.Join(tmp, "out"),
+		CWD:       tmp,
+		Now:       time.Date(2026, 2, 20, 19, 0, 0, 0, time.UTC),
+		Rand:      bytes.NewBufferString("ABCDEF"),
+	})
+	if err == nil {
+		t.Fatalf("expected conflict error, got nil")
+	}
+	if !strings.Contains(err.Error(), "配对冲突") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

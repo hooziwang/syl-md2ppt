@@ -8,20 +8,7 @@ type Config struct {
 }
 
 type FilenameConfig struct {
-	Pattern         string         `yaml:"pattern"`
-	Groups          FilenameGroups `yaml:"groups"`
-	Order           FilenameOrder  `yaml:"order"`
-	IgnoreUnmatched bool           `yaml:"ignore_unmatched"`
-}
-
-type FilenameGroups struct {
-	Domain int `yaml:"domain"`
-	Card   int `yaml:"card"`
-	Side   int `yaml:"side"`
-}
-
-type FilenameOrder struct {
-	Side []string `yaml:"side"`
+	IgnoreUnmatched bool `yaml:"ignore_unmatched"`
 }
 
 type LayoutConfig struct {
@@ -83,21 +70,6 @@ type DefaultNameConfig struct {
 }
 
 func (c *Config) applyDefaults() {
-	if c.Filename.Pattern == "" {
-		c.Filename.Pattern = `^(\d+)-(\d{3})-(Front|Back)\.md$`
-	}
-	if c.Filename.Groups.Domain <= 0 {
-		c.Filename.Groups.Domain = 1
-	}
-	if c.Filename.Groups.Card <= 0 {
-		c.Filename.Groups.Card = 2
-	}
-	if c.Filename.Groups.Side <= 0 {
-		c.Filename.Groups.Side = 3
-	}
-	if len(c.Filename.Order.Side) == 0 {
-		c.Filename.Order.Side = []string{"Front", "Back"}
-	}
 	if c.Layout.Slide.Width == 0 {
 		c.Layout.Slide.Width = 13.333
 	}

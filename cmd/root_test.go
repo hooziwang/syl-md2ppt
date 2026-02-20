@@ -161,6 +161,49 @@ func TestCheckShowsDetailedList(t *testing.T) {
 	}
 }
 
+func TestCheckShowsConflictSummary(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "SPI")
+	enDir := filepath.Join(source, "EN", "D")
+	cnDir := filepath.Join(source, "CN", "D")
+	if err := os.MkdirAll(enDir, 0o755); err != nil {
+		t.Fatalf("mkdir en: %v", err)
+	}
+	if err := os.MkdirAll(cnDir, 0o755); err != nil {
+		t.Fatalf("mkdir cn: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(enDir, "deck-1-1-012-X.md"), []byte("EN X"), 0o644); err != nil {
+		t.Fatalf("write en x: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(enDir, "deck-1-1-012-Y.md"), []byte("EN Y"), 0o644); err != nil {
+		t.Fatalf("write en y: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cnDir, "课-1-1-012-X.md"), []byte("CN X"), 0o644); err != nil {
+		t.Fatalf("write cn x: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cnDir, "课-1-1-012-Y.md"), []byte("CN Y"), 0o644); err != nil {
+		t.Fatalf("write cn y: %v", err)
+	}
+
+	stdout := &bytes.Buffer{}
+	stderr := &bytes.Buffer{}
+	root := NewRootCmd(func() time.Time {
+		return time.Date(2026, 2, 20, 20, 0, 0, 0, time.UTC)
+	}, bytes.NewBufferString("ABCDEF"), stdout, stderr)
+	root.SetArgs([]string{"check", source})
+
+	if err := root.Execute(); err != nil {
+		t.Fatalf("expected no error, got: %v", err)
+	}
+	out := stdout.String()
+	if !strings.Contains(out, "检查完成：共识别 2 对双语文件，可生成 2 页 PPT；发现 1 组冲突，请先人工确认") {
+		t.Fatalf("unexpected conflict summary output: %q", out)
+	}
+	if strings.Contains(out, "检查通过：") {
+		t.Fatalf("should not show pass summary when conflict exists: %q", out)
+	}
+}
+
 func TestVersionCommand(t *testing.T) {
 	stdout := &bytes.Buffer{}
 	stderr := &bytes.Buffer{}

@@ -179,6 +179,10 @@ func runCheck(stdout io.Writer, stderr io.Writer, flags *buildFlags, showVersion
 			fmt.Fprintf(stdout, "[%03d] - %s\n", it.No, it.ENPath)
 			fmt.Fprintf(stdout, "[%03d] - %s\n", it.No, it.CNPath)
 		}
+		if res.HasConflict {
+			fmt.Fprintf(stdout, "检查完成：共识别 %d 对双语文件，可生成 %d 页 PPT；发现 %d 组冲突，请先人工确认\n", res.PairCount, res.PairCount, res.ConflictCount)
+			return nil
+		}
 		fmt.Fprintf(stdout, "检查通过：共识别 %d 对双语文件，可生成 %d 页 PPT\n", res.PairCount, res.PairCount)
 		return nil
 	}

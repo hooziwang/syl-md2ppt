@@ -11,7 +11,7 @@ import (
 
 func TestNumberFingerprintUsesNonRepeatedNumbers(t *testing.T) {
 	key, nums := numberFingerprint("deck-1-1-002-front.md")
-	if key != "002" {
+	if key != "2" {
 		t.Fatalf("unexpected key: %s", key)
 	}
 	if len(nums) != 1 || nums[0] != 2 {
@@ -19,7 +19,7 @@ func TestNumberFingerprintUsesNonRepeatedNumbers(t *testing.T) {
 	}
 
 	key, nums = numberFingerprint("lesson-01-topic-003.md")
-	if key != "01-003" {
+	if key != "1-3" {
 		t.Fatalf("unexpected key: %s", key)
 	}
 	if len(nums) != 2 || nums[0] != 1 || nums[1] != 3 {
@@ -56,7 +56,7 @@ func TestDiscoverSortAndPairByUniqueNumbers(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Filename.IgnoreUnmatched = true
 
-	pairs, warnings, err := Discover(source, cfg)
+	pairs, warnings, err := Discover(source, cfg, DiscoverOptions{})
 	if err != nil {
 		t.Fatalf("Discover returned error: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestDiscoverRecognizesAAndBAsFrontBack(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Filename.IgnoreUnmatched = true
 
-	pairs, _, err := Discover(source, cfg)
+	pairs, _, err := Discover(source, cfg, DiscoverOptions{})
 	if err != nil {
 		t.Fatalf("Discover returned error: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestDiscoverFailsOnMissingPair(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Filename.IgnoreUnmatched = true
 
-	_, _, err := Discover(source, cfg)
+	_, _, err := Discover(source, cfg, DiscoverOptions{})
 	if err == nil {
 		t.Fatalf("expected pairing error, got nil")
 	}
@@ -155,19 +155,48 @@ func TestDiscoverWarnsOnConflictGroup(t *testing.T) {
 	cfg := &config.Config{}
 	cfg.Filename.IgnoreUnmatched = true
 
-	_, warnings, err := Discover(source, cfg)
+	_, warnings, err := Discover(source, cfg, DiscoverOptions{})
 	if err != nil {
 		t.Fatalf("Discover returned error: %v", err)
 	}
 	hasConflict := false
 	for _, w := range warnings {
-		if strings.Contains(w, "冲突组：") && strings.Contains(w, "D/012") {
+		if strings.Contains(w, "冲突组：") && strings.Contains(w, "D/12") {
 			hasConflict = true
 			break
 		}
 	}
 	if !hasConflict {
 		t.Fatalf("expected conflict warning, got: %#v", warnings)
+	}
+}
+
+func TestDiscoverPairsDifferentZeroPadding(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "SPI")
+	en := filepath.Join(source, "EN", "D")
+	cn := filepath.Join(source, "CN", "D")
+	if err := os.MkdirAll(en, 0o755); err != nil {
+		t.Fatalf("mkdir en: %v", err)
+	}
+	if err := os.MkdirAll(cn, 0o755); err != nil {
+		t.Fatalf("mkdir cn: %v", err)
+	}
+
+	mustWrite(t, filepath.Join(en, "deck-001-Front.md"), "EN")
+	mustWrite(t, filepath.Join(cn, "课程-1-Front.md"), "CN")
+
+	cfg := &config.Config{}
+	cfg.Filename.IgnoreUnmatched = true
+	pairs, warnings, err := Discover(source, cfg, DiscoverOptions{})
+	if err != nil {
+		t.Fatalf("Discover returned error: %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("expected no warnings, got: %#v", warnings)
+	}
+	if len(pairs) != 1 {
+		t.Fatalf("expected one pair, got: %d", len(pairs))
 	}
 }
 
