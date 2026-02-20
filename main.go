@@ -9,7 +9,9 @@ import (
 
 func main() {
 	if err := cmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, cmd.FriendlyError(err))
+		if msg := cmd.FriendlyError(err); msg != "" {
+			fmt.Fprintln(os.Stderr, msg)
+		}
 		os.Exit(1)
 	}
 }

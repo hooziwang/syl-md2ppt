@@ -8,7 +8,30 @@ import (
 	"syl-md2ppt/internal/config"
 )
 
-func TestDiscoverSortAndPair(t *testing.T) {
+func TestNumberFingerprintUsesNonRepeatedNumbers(t *testing.T) {
+	key, nums := numberFingerprint("deck-1-1-002-front.md")
+	if key != "002" {
+		t.Fatalf("unexpected key: %s", key)
+	}
+	if len(nums) != 1 || nums[0] != 2 {
+		t.Fatalf("unexpected nums: %#v", nums)
+	}
+
+	key, nums = numberFingerprint("lesson-01-topic-003.md")
+	if key != "01-003" {
+		t.Fatalf("unexpected key: %s", key)
+	}
+	if len(nums) != 2 || nums[0] != 1 || nums[1] != 3 {
+		t.Fatalf("unexpected nums: %#v", nums)
+	}
+
+	key, nums = numberFingerprint("readme.md")
+	if key != "" || nums != nil {
+		t.Fatalf("expected empty fingerprint for file without numbers")
+	}
+}
+
+func TestDiscoverSortAndPairByUniqueNumbers(t *testing.T) {
 	tmp := t.TempDir()
 	source := filepath.Join(tmp, "SPI")
 	en := filepath.Join(source, "EN")
@@ -20,23 +43,16 @@ func TestDiscoverSortAndPair(t *testing.T) {
 		t.Fatalf("mkdir cn: %v", err)
 	}
 
-	mustWrite(t, filepath.Join(en, "Domain", "1-002-Back.md"), "EN back")
-	mustWrite(t, filepath.Join(en, "Domain", "1-002-Front.md"), "EN front")
-	mustWrite(t, filepath.Join(en, "Domain", "1-003-Front.md"), "EN next front")
-	mustWrite(t, filepath.Join(en, "Domain", "1-003-Back.md"), "EN next back")
+	mustWrite(t, filepath.Join(en, "Domain", "deck-1-1-002-front.md"), "EN front")
+	mustWrite(t, filepath.Join(en, "Domain", "deck-1-1-002-back.md"), "EN back")
+	mustWrite(t, filepath.Join(en, "Domain", "L-3-3-010-A.md"), "EN third")
 	mustWrite(t, filepath.Join(en, "Domain", "README.md"), "ignored")
 
-	mustWrite(t, filepath.Join(cn, "Domain", "1-002-Back.md"), "CN back")
-	mustWrite(t, filepath.Join(cn, "Domain", "1-002-Front.md"), "CN front")
-	mustWrite(t, filepath.Join(cn, "Domain", "1-003-Front.md"), "CN next front")
-	mustWrite(t, filepath.Join(cn, "Domain", "1-003-Back.md"), "CN next back")
+	mustWrite(t, filepath.Join(cn, "Domain", "课程-1-1-002-front.md"), "CN front")
+	mustWrite(t, filepath.Join(cn, "Domain", "课程-1-1-002-back.md"), "CN back")
+	mustWrite(t, filepath.Join(cn, "Domain", "课程-3-3-010-A.md"), "CN third")
 
 	cfg := &config.Config{}
-	cfg.Filename.Pattern = `^(\d+)-(\d{3})-(Front|Back)\.md$`
-	cfg.Filename.Groups.Domain = 1
-	cfg.Filename.Groups.Card = 2
-	cfg.Filename.Groups.Side = 3
-	cfg.Filename.Order.Side = []string{"Front", "Back"}
 	cfg.Filename.IgnoreUnmatched = true
 
 	pairs, warnings, err := Discover(source, cfg)
@@ -46,21 +62,49 @@ func TestDiscoverSortAndPair(t *testing.T) {
 	if len(warnings) != 1 {
 		t.Fatalf("expected 1 warning for unmatched file, got %d", len(warnings))
 	}
-	if len(pairs) != 4 {
-		t.Fatalf("expected 4 pairs, got %d", len(pairs))
+	if len(pairs) != 3 {
+		t.Fatalf("expected 3 pairs, got %d", len(pairs))
+	}
+	if pairs[0].RelPath != "Domain/deck-1-1-002-front.md" {
+		t.Fatalf("expected front first, got %s", pairs[0].RelPath)
+	}
+	if pairs[1].RelPath != "Domain/deck-1-1-002-back.md" {
+		t.Fatalf("expected back second, got %s", pairs[1].RelPath)
+	}
+	if pairs[2].RelPath != "Domain/L-3-3-010-A.md" {
+		t.Fatalf("expected remaining file third, got %s", pairs[2].RelPath)
+	}
+}
+
+func TestDiscoverRecognizesAAndBAsFrontBack(t *testing.T) {
+	tmp := t.TempDir()
+	source := filepath.Join(tmp, "SPI")
+	en := filepath.Join(source, "EN", "D")
+	cn := filepath.Join(source, "CN", "D")
+	if err := os.MkdirAll(en, 0o755); err != nil {
+		t.Fatalf("mkdir en: %v", err)
+	}
+	if err := os.MkdirAll(cn, 0o755); err != nil {
+		t.Fatalf("mkdir cn: %v", err)
 	}
 
-	got := []string{pairs[0].RelPath, pairs[1].RelPath, pairs[2].RelPath, pairs[3].RelPath}
-	want := []string{
-		"Domain/1-002-Front.md",
-		"Domain/1-002-Back.md",
-		"Domain/1-003-Front.md",
-		"Domain/1-003-Back.md",
+	mustWrite(t, filepath.Join(en, "2-2-011-B.md"), "EN back")
+	mustWrite(t, filepath.Join(en, "2-2-011-A.md"), "EN front")
+	mustWrite(t, filepath.Join(cn, "2-2-011-B.md"), "CN back")
+	mustWrite(t, filepath.Join(cn, "2-2-011-A.md"), "CN front")
+
+	cfg := &config.Config{}
+	cfg.Filename.IgnoreUnmatched = true
+
+	pairs, _, err := Discover(source, cfg)
+	if err != nil {
+		t.Fatalf("Discover returned error: %v", err)
 	}
-	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("unexpected order at %d: want=%s got=%s", i, want[i], got[i])
-		}
+	if len(pairs) != 2 {
+		t.Fatalf("expected 2 pairs, got %d", len(pairs))
+	}
+	if pairs[0].RelPath != "D/2-2-011-A.md" || pairs[1].RelPath != "D/2-2-011-B.md" {
+		t.Fatalf("expected A then B order, got %s then %s", pairs[0].RelPath, pairs[1].RelPath)
 	}
 }
 
@@ -76,16 +120,11 @@ func TestDiscoverFailsOnMissingPair(t *testing.T) {
 		t.Fatalf("mkdir cn: %v", err)
 	}
 
-	mustWrite(t, filepath.Join(en, "Domain", "1-002-Front.md"), "EN")
-	mustWrite(t, filepath.Join(cn, "Domain", "1-002-Front.md"), "CN")
-	mustWrite(t, filepath.Join(en, "Domain", "1-002-Back.md"), "EN back")
+	mustWrite(t, filepath.Join(en, "Domain", "deck-1-1-002-front.md"), "EN")
+	mustWrite(t, filepath.Join(cn, "Domain", "课程-1-1-002-front.md"), "CN")
+	mustWrite(t, filepath.Join(en, "Domain", "deck-1-1-002-back.md"), "EN back")
 
 	cfg := &config.Config{}
-	cfg.Filename.Pattern = `^(\d+)-(\d{3})-(Front|Back)\.md$`
-	cfg.Filename.Groups.Domain = 1
-	cfg.Filename.Groups.Card = 2
-	cfg.Filename.Groups.Side = 3
-	cfg.Filename.Order.Side = []string{"Front", "Back"}
 	cfg.Filename.IgnoreUnmatched = true
 
 	_, _, err := Discover(source, cfg)

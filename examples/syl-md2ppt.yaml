@@ -1,11 +1,4 @@
 filename:
-  pattern: '^(\d+)-(\d{3})-(Front|Back)\.md$'
-  groups:
-    domain: 1
-    card: 2
-    side: 3
-  order:
-    side: ["Front", "Back"]
   ignore_unmatched: true
 
 layout:

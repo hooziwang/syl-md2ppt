@@ -105,8 +105,50 @@ scoop uninstall syl-md2ppt
 ### 入口 2（子命令）
 
 ```bash
-./syl-md2ppt build <data_source_dir> [--output ...] [--config ...]
+syl-md2ppt build <data_source_dir> [--output ...] [--config ...]
 ```
+
+### 入口 3（仅检查，不生成文件）
+
+```bash
+syl-md2ppt check <data_source_dir> [--config ...]
+```
+
+## 数据源要求
+
+推荐的数据源目录结构示意：
+
+```text
+SPI/
+├─ EN/
+│  ├─ 00_Intro/
+│  │  ├─ 0-001-Front.md
+│  │  └─ 0-001-Back.md
+│  └─ 01_Domain1/
+│     ├─ 1-002-Front.md
+│     └─ 1-002-Back.md
+└─ CN/
+   ├─ 00_Intro/
+   │  ├─ 0-001-Front.md
+   │  └─ 0-001-Back.md
+   └─ 01_Domain1/
+      ├─ 1-002-Front.md
+      └─ 1-002-Back.md
+```
+
+其中：
+
+1. `EN/` 放英文 md，`CN/` 放中文 md。
+2. `EN/` 与 `CN/` 下建议使用相同的子目录层级，便于一一配对。
+3. 同一卡片建议同时准备正反面（`Front`/`Back` 或 `A`/`B`）。
+
+1. 数据源目录必须包含 `EN/` 和 `CN/` 两个子目录。
+2. 程序会递归扫描 `EN/`、`CN/` 下所有 `.md` 文件。
+3. 配对时不依赖固定文件名模板，而是提取文件名中的数字，仅使用“非重复数字”作为配对键。
+4. 同一相对目录下，`EN` 与 `CN` 的非重复数字键一致，才会配成一对。
+5. 同一卡片内会识别正反面并排序：`Front`/`A` 视为正面，`Back`/`B` 视为反面（正面在前、反面在后）。
+6. 如果某个编号组在 `EN`/`CN` 数量不一致，会报错退出。
+7. 文件名中没有可用非重复数字时，按 `filename.ignore_unmatched` 决定跳过或报错。
 
 ## 参数
 
@@ -118,17 +160,14 @@ scoop uninstall syl-md2ppt
 - `--config`：可选。
   - 优先级：`--config` > 当前目录 `syl-md2ppt.yaml` > 内置默认模板
 
-## 文件名规则（可配置）
+## 文件名智能配对规则
 
-默认正则：
+程序会从文件名里提取数字，并只使用“非重复数字”做配对键：
 
-```regex
-^(\d+)-(\d{3})-(Front|Back)\.md$
-```
-
-默认排序：
-1. `card_no` 升序
-2. 同号内 `Front` 在前，`Back` 在后
+- 不依赖固定命名模板，不要求 `Front/Back` 这种固定格式。
+- 同一文件名里重复出现的数字会被忽略，只保留非重复数字。
+- EN 和 CN 在同一相对目录下，非重复数字键一致，就会被视为一对。
+- 如果某个文件名里没有可用的非重复数字，会按配置决定跳过或报错。
 
 ## 退出行为
 

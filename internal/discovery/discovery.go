@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"io/fs"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,20 +12,21 @@ import (
 )
 
 type Pair struct {
-	RelPath string
-	ENPath  string
-	CNPath  string
-	Domain  int
-	Card    int
-	Side    string
+	RelPath  string
+	ENPath   string
+	CNPath   string
+	Numbers  []int
+	sideRank int
 }
 
 type parsedFile struct {
-	relPath string
-	absPath string
-	domain  int
-	card    int
-	side    string
+	relPath    string
+	absPath    string
+	dirRel     string
+	numberKey  string
+	numberList []int
+	sideRank   int
+	sortHint   string
 }
 
 func Discover(source string, cfg *config.Config) ([]Pair, []string, error) {
@@ -36,66 +36,70 @@ func Discover(source string, cfg *config.Config) ([]Pair, []string, error) {
 	enRoot := filepath.Join(source, "EN")
 	cnRoot := filepath.Join(source, "CN")
 
-	re, err := regexp.Compile(cfg.Filename.Pattern)
-	if err != nil {
-		return nil, nil, fmt.Errorf("文件名规则有问题，请检查正则：%w", err)
-	}
-
-	enFiles, warnEN, err := scanSide(enRoot, re, cfg)
+	enGroups, warnEN, err := scanSide(enRoot, cfg)
 	if err != nil {
 		return nil, nil, err
 	}
-	cnFiles, warnCN, err := scanSide(cnRoot, re, cfg)
+	cnGroups, warnCN, err := scanSide(cnRoot, cfg)
 	if err != nil {
 		return nil, nil, err
 	}
 	warnings := append(warnEN, warnCN...)
 
+	keys := make(map[string]struct{}, len(enGroups)+len(cnGroups))
+	for k := range enGroups {
+		keys[k] = struct{}{}
+	}
+	for k := range cnGroups {
+		keys[k] = struct{}{}
+	}
+	keyList := make([]string, 0, len(keys))
+	for k := range keys {
+		keyList = append(keyList, k)
+	}
+	sort.Strings(keyList)
+
+	pairs := make([]Pair, 0)
 	missing := make([]string, 0)
-	for rel := range enFiles {
-		if _, ok := cnFiles[rel]; !ok {
-			missing = append(missing, fmt.Sprintf("中文目录缺少同名文件：%s", rel))
+	for _, key := range keyList {
+		enGroup := enGroups[key]
+		cnGroup := cnGroups[key]
+		switch {
+		case len(enGroup) == 0:
+			missing = append(missing, fmt.Sprintf("英文目录缺少对应编号文件：%s", displayGroupKey(key)))
+			continue
+		case len(cnGroup) == 0:
+			missing = append(missing, fmt.Sprintf("中文目录缺少对应编号文件：%s", displayGroupKey(key)))
+			continue
+		case len(enGroup) != len(cnGroup):
+			missing = append(missing, fmt.Sprintf("中英文编号组文件数量不一致（%s）：EN=%d，CN=%d", displayGroupKey(key), len(enGroup), len(cnGroup)))
+			continue
+		}
+
+		sortParsedFiles(enGroup)
+		sortParsedFiles(cnGroup)
+		for i := range enGroup {
+			pairs = append(pairs, Pair{
+				RelPath:  enGroup[i].relPath,
+				ENPath:   enGroup[i].absPath,
+				CNPath:   cnGroup[i].absPath,
+				Numbers:  enGroup[i].numberList,
+				sideRank: enGroup[i].sideRank,
+			})
 		}
 	}
-	for rel := range cnFiles {
-		if _, ok := enFiles[rel]; !ok {
-			missing = append(missing, fmt.Sprintf("英文目录缺少同名文件：%s", rel))
-		}
-	}
+
 	if len(missing) > 0 {
 		sort.Strings(missing)
 		return nil, warnings, fmt.Errorf("中英文文件没配齐：%s", strings.Join(missing, "；"))
 	}
 
-	sideRank := make(map[string]int, len(cfg.Filename.Order.Side))
-	for i, side := range cfg.Filename.Order.Side {
-		sideRank[side] = i
-	}
-
-	pairs := make([]Pair, 0, len(enFiles))
-	for rel, enFile := range enFiles {
-		cnFile := cnFiles[rel]
-		pairs = append(pairs, Pair{
-			RelPath: rel,
-			ENPath:  enFile.absPath,
-			CNPath:  cnFile.absPath,
-			Domain:  enFile.domain,
-			Card:    enFile.card,
-			Side:    enFile.side,
-		})
-	}
-
 	sort.Slice(pairs, func(i, j int) bool {
-		if pairs[i].Card != pairs[j].Card {
-			return pairs[i].Card < pairs[j].Card
+		if c := compareIntSlice(pairs[i].Numbers, pairs[j].Numbers); c != 0 {
+			return c < 0
 		}
-		ri, okI := sideRank[pairs[i].Side]
-		rj, okJ := sideRank[pairs[j].Side]
-		if okI && okJ && ri != rj {
-			return ri < rj
-		}
-		if pairs[i].Domain != pairs[j].Domain {
-			return pairs[i].Domain < pairs[j].Domain
+		if pairs[i].sideRank != pairs[j].sideRank {
+			return pairs[i].sideRank < pairs[j].sideRank
 		}
 		return pairs[i].RelPath < pairs[j].RelPath
 	})
@@ -103,8 +107,8 @@ func Discover(source string, cfg *config.Config) ([]Pair, []string, error) {
 	return pairs, warnings, nil
 }
 
-func scanSide(root string, re *regexp.Regexp, cfg *config.Config) (map[string]parsedFile, []string, error) {
-	entries := make(map[string]parsedFile)
+func scanSide(root string, cfg *config.Config) (map[string][]parsedFile, []string, error) {
+	entries := make(map[string][]parsedFile)
 	warnings := make([]string, 0)
 
 	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
@@ -124,39 +128,29 @@ func scanSide(root string, re *regexp.Regexp, cfg *config.Config) (map[string]pa
 		}
 		rel = filepath.ToSlash(rel)
 
-		name := filepath.Base(path)
-		m := re.FindStringSubmatch(name)
-		if m == nil {
+		numberKey, numberList := numberFingerprint(filepath.Base(path))
+		if numberKey == "" {
 			if cfg.Filename.IgnoreUnmatched {
-				warnings = append(warnings, fmt.Sprintf("这个文件名不符合规则，先跳过：%s", rel))
+				warnings = append(warnings, fmt.Sprintf("这个文件名里没有可配对的唯一数字，先跳过：%s", rel))
 				return nil
 			}
-			return fmt.Errorf("文件名不符合规则：%s", rel)
+			return fmt.Errorf("文件名里没有可配对的唯一数字：%s", rel)
 		}
 
-		domain, err := atoiGroup(m, cfg.Filename.Groups.Domain)
-		if err != nil {
-			return fmt.Errorf("解析域编号失败（%s）：%w", rel, err)
+		dirRel := filepath.ToSlash(filepath.Dir(rel))
+		if dirRel == "." {
+			dirRel = ""
 		}
-		card, err := atoiGroup(m, cfg.Filename.Groups.Card)
-		if err != nil {
-			return fmt.Errorf("解析卡片编号失败（%s）：%w", rel, err)
-		}
-		side, err := strGroup(m, cfg.Filename.Groups.Side)
-		if err != nil {
-			return fmt.Errorf("解析 Front/Back 失败（%s）：%w", rel, err)
-		}
-
-		if _, exists := entries[rel]; exists {
-			return fmt.Errorf("检测到重复文件：%s", rel)
-		}
-		entries[rel] = parsedFile{
-			relPath: rel,
-			absPath: path,
-			domain:  domain,
-			card:    card,
-			side:    side,
-		}
+		groupKey := makeGroupKey(dirRel, numberKey)
+		entries[groupKey] = append(entries[groupKey], parsedFile{
+			relPath:    rel,
+			absPath:    path,
+			dirRel:     dirRel,
+			numberKey:  numberKey,
+			numberList: numberList,
+			sideRank:   detectSideRank(filepath.Base(path)),
+			sortHint:   normalizeFilenameHint(filepath.Base(path)),
+		})
 		return nil
 	})
 	if err != nil {
@@ -166,21 +160,183 @@ func scanSide(root string, re *regexp.Regexp, cfg *config.Config) (map[string]pa
 	return entries, warnings, nil
 }
 
-func atoiGroup(m []string, idx int) (int, error) {
-	s, err := strGroup(m, idx)
-	if err != nil {
-		return 0, err
-	}
-	n, err := strconv.Atoi(s)
-	if err != nil {
-		return 0, err
-	}
-	return n, nil
+func makeGroupKey(dirRel, numKey string) string {
+	return dirRel + "::" + numKey
 }
 
-func strGroup(m []string, idx int) (string, error) {
-	if idx <= 0 || idx >= len(m) {
-		return "", fmt.Errorf("分组索引越界：%d", idx)
+func displayGroupKey(groupKey string) string {
+	if i := strings.Index(groupKey, "::"); i >= 0 {
+		dir := groupKey[:i]
+		num := groupKey[i+2:]
+		if dir == "" {
+			return num
+		}
+		return dir + "/" + num
 	}
-	return m[idx], nil
+	return groupKey
+}
+
+func numberFingerprint(name string) (string, []int) {
+	base := strings.TrimSuffix(name, filepath.Ext(name))
+	all := extractDigitRuns(base)
+	if len(all) == 0 {
+		return "", nil
+	}
+
+	count := make(map[string]int, len(all))
+	for _, token := range all {
+		count[token]++
+	}
+
+	unique := make([]string, 0, len(all))
+	seen := make(map[string]struct{}, len(all))
+	for _, token := range all {
+		if count[token] != 1 {
+			continue
+		}
+		if _, ok := seen[token]; ok {
+			continue
+		}
+		seen[token] = struct{}{}
+		unique = append(unique, token)
+	}
+	if len(unique) == 0 {
+		return "", nil
+	}
+
+	ints := make([]int, 0, len(unique))
+	for _, token := range unique {
+		n, err := strconv.Atoi(token)
+		if err != nil {
+			continue
+		}
+		ints = append(ints, n)
+	}
+	if len(ints) == 0 {
+		return "", nil
+	}
+
+	return strings.Join(unique, "-"), ints
+}
+
+func extractDigitRuns(s string) []string {
+	out := make([]string, 0)
+	start := -1
+	for i, ch := range s {
+		isDigit := ch >= '0' && ch <= '9'
+		if isDigit && start < 0 {
+			start = i
+			continue
+		}
+		if !isDigit && start >= 0 {
+			out = append(out, s[start:i])
+			start = -1
+		}
+	}
+	if start >= 0 {
+		out = append(out, s[start:])
+	}
+	return out
+}
+
+func normalizeFilenameHint(name string) string {
+	base := strings.TrimSuffix(name, filepath.Ext(name))
+	var b strings.Builder
+	lastDash := false
+	for _, ch := range strings.ToLower(base) {
+		if ch >= '0' && ch <= '9' {
+			lastDash = false
+			continue
+		}
+		isAlpha := (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z')
+		if isAlpha {
+			b.WriteRune(ch)
+			lastDash = false
+			continue
+		}
+		if !lastDash {
+			b.WriteByte('-')
+			lastDash = true
+		}
+	}
+	return strings.Trim(b.String(), "-")
+}
+
+func sortParsedFiles(in []parsedFile) {
+	sort.Slice(in, func(i, j int) bool {
+		if c := compareIntSlice(in[i].numberList, in[j].numberList); c != 0 {
+			return c < 0
+		}
+		if in[i].sideRank != in[j].sideRank {
+			return in[i].sideRank < in[j].sideRank
+		}
+		if in[i].sortHint != in[j].sortHint {
+			return in[i].sortHint < in[j].sortHint
+		}
+		return in[i].relPath < in[j].relPath
+	})
+}
+
+func detectSideRank(name string) int {
+	base := strings.ToLower(strings.TrimSuffix(name, filepath.Ext(name)))
+	tokens := splitAlphaNumTokens(base)
+	hasFront := false
+	hasBack := false
+	for _, tok := range tokens {
+		switch tok {
+		case "front", "a":
+			hasFront = true
+		case "back", "b":
+			hasBack = true
+		}
+	}
+	if hasFront && !hasBack {
+		return 0
+	}
+	if hasBack && !hasFront {
+		return 1
+	}
+	return 2
+}
+
+func splitAlphaNumTokens(s string) []string {
+	out := make([]string, 0)
+	start := -1
+	for i, ch := range s {
+		isAlphaNum := (ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9')
+		if isAlphaNum && start < 0 {
+			start = i
+			continue
+		}
+		if !isAlphaNum && start >= 0 {
+			out = append(out, s[start:i])
+			start = -1
+		}
+	}
+	if start >= 0 {
+		out = append(out, s[start:])
+	}
+	return out
+}
+
+func compareIntSlice(a, b []int) int {
+	min := len(a)
+	if len(b) < min {
+		min = len(b)
+	}
+	for i := 0; i < min; i++ {
+		if a[i] < b[i] {
+			return -1
+		}
+		if a[i] > b[i] {
+			return 1
+		}
+	}
+	if len(a) < len(b) {
+		return -1
+	}
+	if len(a) > len(b) {
+		return 1
+	}
+	return 0
 }

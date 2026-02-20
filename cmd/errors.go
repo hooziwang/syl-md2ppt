@@ -1,15 +1,20 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 )
 
 var unknownCmdPattern = regexp.MustCompile(`unknown command "([^"]+)" for "([^"]+)"`)
+var errAlreadyPrinted = errors.New("错误信息已输出")
 
 func FriendlyError(err error) string {
 	if err == nil {
+		return ""
+	}
+	if errors.Is(err, errAlreadyPrinted) {
 		return ""
 	}
 	msg := strings.TrimSpace(err.Error())
