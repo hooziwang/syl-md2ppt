@@ -1,3 +1,4 @@
 .gocache/
 bin/
 *.pptx
+!internal/pptx/templates/default.pptx
