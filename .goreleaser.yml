@@ -56,7 +56,7 @@ brews:
       owner: hooziwang
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
-    folder: Formula
+    directory: Formula
     homepage: "https://github.com/hooziwang/syl-md2ppt"
     description: "把 EN/CN Markdown 一键转换为单个双语 PPTX 的命令行工具"
     commit_author:
@@ -71,7 +71,7 @@ scoops:
       owner: hooziwang
       name: scoop-bucket
       token: "{{ .Env.SCOOP_BUCKET_GITHUB_TOKEN }}"
-    folder: bucket
+    directory: bucket
     homepage: "https://github.com/hooziwang/syl-md2ppt"
     description: "把 EN/CN Markdown 一键转换为单个双语 PPTX 的命令行工具"
     commit_author:
