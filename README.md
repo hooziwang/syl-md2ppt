@@ -12,21 +12,95 @@
 
 ## 安装
 
-### Homebrew（macOS）
+### 方式 1：Homebrew（macOS，推荐）
+
+1. 检查是否已安装 Homebrew：
+
+```bash
+brew --version
+```
+
+如果提示 `command not found`，先安装 Homebrew：
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
+Apple Silicon（M1/M2/M3）如果装完还找不到 `brew`，执行：
+
+```bash
+echo 'eval "$(/opt/homebrew/bin/brew shellenv)"' >> ~/.zprofile
+eval "$(/opt/homebrew/bin/brew shellenv)"
+```
+
+2. 安装 `syl-md2ppt`：
 
 ```bash
 brew tap hooziwang/tap
 brew install syl-md2ppt
 ```
 
-### Scoop（Windows）
+3. 验证安装：
+
+```bash
+syl-md2ppt -v
+```
+
+4. 后续升级：
+
+```bash
+brew update
+brew upgrade syl-md2ppt
+```
+
+5. 卸载：
+
+```bash
+brew uninstall syl-md2ppt
+```
+
+### 方式 2：Scoop（Windows，推荐）
+
+1. 以普通用户打开 PowerShell，先检查是否已安装 Scoop：
+
+```powershell
+scoop --version
+```
+
+如果提示找不到命令，先安装 Scoop：
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+irm get.scoop.sh | iex
+```
+
+2. 安装 `syl-md2ppt`：
 
 ```powershell
 scoop bucket add hooziwang https://github.com/hooziwang/scoop-bucket
 scoop install syl-md2ppt
 ```
 
-### 源码构建（开发者）
+3. 验证安装：
+
+```powershell
+syl-md2ppt -v
+```
+
+4. 后续升级：
+
+```powershell
+scoop update
+scoop update syl-md2ppt
+```
+
+5. 卸载：
+
+```powershell
+scoop uninstall syl-md2ppt
+```
+
+### 方式 3：源码构建（开发者）
 
 ```bash
 go build -o syl-md2ppt .
