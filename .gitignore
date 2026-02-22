@@ -2,3 +2,4 @@
 bin/
 *.pptx
 !internal/pptx/templates/default.pptx
+.DS_Store
